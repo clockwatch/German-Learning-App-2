@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>German Learning Video Player</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --highlight: #A8FF3E;
+    --bg: #09090B;
+    --sidebar-bg: rgba(24,24,27,0.85);
+    --border: rgba(255,255,255,0.06);
+    --text: #FAFAFA;
+    --muted: rgba(255,255,255,0.45);
+    --card: rgba(28,28,30,0.82);
+    --accent: #6366F1;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Manrope', sans-serif;
+    overflow: hidden;
+  }
+
+  #app {
+    display: flex;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ── SIDEBAR ── */
+  #sidebar {
+    width: 300px;
+    flex-shrink: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: var(--sidebar-bg);
+    backdrop-filter: blur(32px) saturate(160%);
+    border-right: 1px solid var(--border);
+    z-index: 20;
+    padding: 24px;
+    gap: 24px;
+    overflow-y: auto;
+  }
+
+  #sidebar h2 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: var(--text);
+    margin-bottom: 16px;
+  }
+
+  .sidebar-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .btn-primary {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: #fff;
+    color: #000;
+    font-family: inherit;
+    font-size: 0.875rem;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-primary:hover { background: rgba(255,255,255,0.88); }
+
+  .btn-secondary {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.1);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.875rem;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-secondary:hover { background: rgba(255,255,255,0.18); }
+
+  .section-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+
+  /* Tabs */
+  .tabs-header {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    background: rgba(255,255,255,0.05);
+    border-radius: 10px;
+    padding: 4px;
+    gap: 4px;
+  }
+  .tab-btn {
+    padding: 6px 12px;
+    border-radius: 7px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .tab-btn.active {
+    background: rgba(255,255,255,0.1);
+    color: var(--text);
+  }
+
+  .tab-content { display: none; flex-direction: column; gap: 6px; flex: 1; }
+  .tab-content.active { display: flex; }
+
+  /* Video list */
+  .video-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .video-item:hover { background: rgba(255,255,255,0.08); }
+  .video-item.selected { background: rgba(168,255,62,0.1); border-color: rgba(168,255,62,0.25); }
+  .video-item-icon { opacity: 0.5; flex-shrink: 0; }
+  .video-item-name { font-size: 0.8125rem; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .empty-state { text-align: center; padding: 32px 0; color: var(--muted); font-size: 0.875rem; }
+
+  /* Saved words */
+  .word-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+  }
+  .word-de { font-size: 0.9rem; font-weight: 600; color: var(--highlight); }
+  .word-en { font-size: 0.8rem; color: var(--muted); }
+  .word-delete {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 6px;
+    transition: color 0.15s;
+    display: flex;
+    align-items: center;
+  }
+  .word-delete:hover { color: #ff4444; }
+
+  /* ── VIDEO PLAYER ── */
+  #player-area {
+    flex: 1;
+    height: 100%;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    background: #000;
+    overflow: hidden;
+  }
+
+  #video-el {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #000;
+  }
+
+  /* Welcome screen */
+  #welcome {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #0d0d10 0%, #111117 100%);
+    z-index: 5;
+  }
+  .welcome-inner { text-align: center; max-width: 480px; padding: 48px; }
+  .welcome-inner h1 {
+    font-size: clamp(1.8rem, 4vw, 3rem);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    color: #fff;
+    margin-bottom: 16px;
+    line-height: 1.1;
+  }
+  .welcome-inner h1 span { color: var(--highlight); }
+  .welcome-inner p { font-size: 1rem; color: var(--muted); line-height: 1.6; }
+  .welcome-dots {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin-bottom: 32px;
+  }
+  .welcome-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--highlight); opacity: 0.3; }
+  .welcome-dot:nth-child(2) { opacity: 0.6; }
+  .welcome-dot:nth-child(3) { opacity: 1; }
+
+  /* ── SUBTITLE DISPLAY ── */
+  #subtitle-overlay {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0 48px 120px;
+    background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 50%, transparent 100%);
+    padding-top: 80px;
+    pointer-events: none;
+  }
+
+  #subtitle-text {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px 6px;
+    pointer-events: auto;
+  }
+
+  .subtitle-word {
+    font-size: clamp(1.4rem, 3vw, 2.4rem);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: #fff;
+    cursor: pointer;
+    transition: color 0.15s, transform 0.15s;
+    display: inline-block;
+    line-height: 1.3;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.9), 0 0 30px rgba(0,0,0,0.7);
+    position: relative;
+  }
+  .subtitle-word:hover {
+    color: var(--highlight);
+    transform: translateY(-2px) scale(1.05);
+  }
+  .subtitle-word.active-word { color: var(--highlight); }
+
+  /* Translation popup */
+  .word-popup {
+    position: absolute;
+    bottom: calc(100% + 12px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--card);
+    backdrop-filter: blur(24px);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 16px;
+    padding: 16px;
+    min-width: 220px;
+    max-width: 300px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+    z-index: 100;
+    pointer-events: auto;
+    white-space: nowrap;
+  }
+  .word-popup::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: rgba(255,255,255,0.12);
+  }
+
+  .popup-word { font-size: 1.3rem; font-weight: 700; color: var(--highlight); margin-bottom: 4px; }
+  .popup-translation { font-size: 0.875rem; color: rgba(255,255,255,0.75); margin-bottom: 12px; }
+  .popup-loading { font-size: 0.8125rem; color: var(--muted); font-style: italic; margin-bottom: 12px; }
+  .popup-actions { display: flex; gap: 8px; }
+  .popup-btn {
+    flex: 1;
+    padding: 7px 10px;
+    border-radius: 8px;
+    border: none;
+    font-family: inherit;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .popup-btn-save {
+    background: var(--accent);
+    color: #fff;
+  }
+  .popup-btn-save:hover { background: #4f51c8; }
+  .popup-btn-save:disabled { opacity: 0.4; cursor: default; }
+  .popup-btn-speak {
+    background: rgba(255,255,255,0.1);
+    color: var(--text);
+  }
+  .popup-btn-speak:hover { background: rgba(255,255,255,0.18); }
+
+  /* ── CONTROLS ── */
+  #controls-overlay {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    z-index: 40;
+    padding: 0 40px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    transition: opacity 0.3s;
+  }
+  #controls-overlay.hidden { opacity: 0; pointer-events: none; }
+
+  /* Progress bar */
+  #progress-bar-wrapper {
+    width: 100%;
+    height: 4px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 4px;
+    cursor: pointer;
+    position: relative;
+    overflow: visible;
+  }
+  #progress-bar-wrapper:hover { height: 6px; }
+  #progress-fill {
+    height: 100%;
+    background: var(--highlight);
+    border-radius: 4px;
+    transition: width 0.1s linear;
+    pointer-events: none;
+  }
+
+  /* Control row */
+  #controls-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 20px;
+    background: rgba(28,28,30,0.82);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 50px;
+    width: fit-content;
+    margin: 0 auto;
+  }
+
+  .ctrl-btn {
+    background: none;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s;
+    font-size: 0;
+  }
+  .ctrl-btn:hover { color: var(--highlight); }
+  .ctrl-btn svg { display: block; }
+
+  #volume-wrapper { display: flex; align-items: center; gap: 8px; }
+  #volume-slider {
+    -webkit-appearance: none;
+    width: 72px; height: 4px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.3);
+    outline: none;
+    cursor: pointer;
+  }
+  #volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: #fff;
+    cursor: pointer;
+  }
+
+  #time-display { font-size: 0.8125rem; color: rgba(255,255,255,0.65); font-weight: 600; letter-spacing: 0.02em; white-space: nowrap; }
+
+  /* Seek hint */
+  .seek-flash {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0,0,0,0.55);
+    color: #fff;
+    font-size: 1.1rem;
+    font-weight: 700;
+    padding: 12px 20px;
+    border-radius: 12px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 50;
+  }
+  #seek-left { left: 20%; }
+  #seek-right { right: 20%; }
+  .seek-flash.show { opacity: 1; }
+
+  /* Toast */
+  #toast {
+    position: fixed;
+    top: 20px; right: 20px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .toast-item {
+    padding: 12px 18px;
+    border-radius: 12px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    animation: toastIn 0.2s ease;
+    max-width: 280px;
+  }
+  .toast-success { background: rgba(40,60,20,0.9); border: 1px solid rgba(168,255,62,0.3); color: var(--highlight); }
+  .toast-error { background: rgba(60,15,15,0.9); border: 1px solid rgba(255,80,80,0.3); color: #ff6868; }
+  @keyframes toastIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: none; } }
+
+  /* hidden file inputs */
+  input[type="file"] { display: none !important; }
+
+  /* scrollbar */
+  #sidebar::-webkit-scrollbar { width: 5px; }
+  #sidebar::-webkit-scrollbar-track { background: transparent; }
+  #sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 10px; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <aside id="sidebar">
+    <h2>German Learning</h2>
+
+    <div class="sidebar-section">
+      <button class="btn-primary" onclick="document.getElementById('video-input').click()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>
+        Select Videos
+      </button>
+      <input id="video-input" type="file" accept="video/*,.mp4,.mkv,.avi,.webm,.mov" multiple>
+
+      <button class="btn-secondary" onclick="document.getElementById('subtitle-input').click()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+        Load Subtitle Files
+      </button>
+      <input id="subtitle-input" type="file" accept=".srt,.vtt" multiple>
+    </div>
+
+    <div style="display:flex;flex-direction:column;flex:1;gap:12px;min-height:0;">
+      <div class="tabs-header">
+        <button class="tab-btn active" onclick="switchTab('videos')">Videos</button>
+        <button class="tab-btn" onclick="switchTab('words')">Saved Words</button>
+      </div>
+
+      <div id="tab-videos" class="tab-content active">
+        <div id="video-list">
+          <div class="empty-state">No videos selected</div>
+        </div>
+      </div>
+
+      <div id="tab-words" class="tab-content">
+        <div id="words-list">
+          <div class="empty-state">No saved words yet</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <main id="player-area">
+    <div id="welcome">
+      <div class="welcome-inner">
+        <div class="welcome-dots">
+          <div class="welcome-dot"></div>
+          <div class="welcome-dot"></div>
+          <div class="welcome-dot"></div>
+        </div>
+        <h1>German Learning<br><span>Video Player</span></h1>
+        <p>Select a video from the sidebar to start learning. Hover over subtitle words to see translations.</p>
+      </div>
+    </div>
+
+    <div id="seek-left" class="seek-flash">◀◀ 5s</div>
+    <div id="seek-right" class="seek-flash">5s ▶▶</div>
+
+    <video id="video-el"
+      onplay="onVideoPlay()"
+      onpause="onVideoPause()"
+      ontimeupdate="onTimeUpdate()"
+      onloadedmetadata="onMetadataLoaded()"
+      onfullscreenchange="onFullscreenChange()"
+    ></video>
+
+    <div id="subtitle-overlay" style="display:none;">
+      <div id="subtitle-text"></div>
+    </div>
+
+    <div id="controls-overlay">
+      <div id="progress-bar-wrapper" onclick="handleSeekClick(event)">
+        <div id="progress-fill" style="width:0%"></div>
+      </div>
+      <div id="controls-row">
+        <button class="ctrl-btn" id="play-btn" onclick="togglePlay()" title="Play/Pause (Space)">
+          <svg id="icon-play" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+          <svg id="icon-pause" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg>
+        </button>
+
+        <div id="volume-wrapper">
+          <button class="ctrl-btn" id="mute-btn" onclick="toggleMute()" title="Mute/Unmute">
+            <svg id="icon-vol" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.364 18.364a9 9 0 0 0 0-12.728"/></svg>
+            <svg id="icon-mute" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/></svg>
+          </button>
+          <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="1" oninput="handleVolumeChange(this.value)">
+        </div>
+
+        <div id="time-display">0:00 / 0:00</div>
+
+        <button class="ctrl-btn" onclick="toggleFullscreen()" title="Fullscreen">
+          <svg id="icon-fullscreen" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+          <svg id="icon-minimize" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
+        </button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────────────────────────
+const state = {
+  videos: [],
+  subtitleFiles: [], 
+  selectedVideoIdx: null,
+  subtitles: [],
+  savedWords: JSON.parse(localStorage.getItem('de_saved_words') || '[]'),
+  currentTime: 0,
+  duration: 0,
+  isPlaying: false,
+  isMuted: false,
+  volume: 1,
+  isFullscreen: false,
+  activeTab: 'videos',
+  // Word hover / popup state
+  hoveredWord: null,
+  translationCache: {},
+  popupWordEl: null,
+  hoverPauseActive: false,
+  controlsHideTimer: null,
+  hoverIntentTimer: null,
+};
+
+const BACKEND_URL = "https://video-deutsch-hub.preview.emergentagent.com";
+const API = `${BACKEND_URL}/api`;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DOM REFS
+// ─────────────────────────────────────────────────────────────────────────────
+const videoEl       = document.getElementById('video-el');
+const welcomeEl     = document.getElementById('welcome');
+const subtitleOv    = document.getElementById('subtitle-overlay');
+const subtitleText  = document.getElementById('subtitle-text');
+const controlsOv    = document.getElementById('controls-overlay');
+const progressFill  = document.getElementById('progress-fill');
+const timeDisplay   = document.getElementById('time-display');
+const playBtn       = document.getElementById('play-btn');
+const iconPlay      = document.getElementById('icon-play');
+const iconPause     = document.getElementById('icon-pause');
+const iconVol       = document.getElementById('icon-vol');
+const iconMute      = document.getElementById('icon-mute');
+const iconFS        = document.getElementById('icon-fullscreen');
+const iconMin       = document.getElementById('icon-minimize');
+const volSlider     = document.getElementById('volume-slider');
+const videoList     = document.getElementById('video-list');
+const wordsList     = document.getElementById('words-list');
+const seekLeft      = document.getElementById('seek-left');
+const seekRight     = document.getElementById('seek-right');
+const toastEl       = document.getElementById('toast');
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FILE INPUT HANDLERS
+// ─────────────────────────────────────────────────────────────────────────────
+document.getElementById('video-input').addEventListener('change', function(e) {
+  const files = Array.from(e.target.files).filter(f =>
+    f.type.startsWith('video/') ||
+    ['.mp4','.mkv','.avi','.webm','.mov'].some(ext => f.name.toLowerCase().endsWith(ext))
+  );
+  if (!files.length) return;
+  state.videos = files;
+  renderVideoList();
+  selectVideo(0);
+  this.value = '';
+});
+
+document.getElementById('subtitle-input').addEventListener('change', function(e) {
+  const files = Array.from(e.target.files);
+  if (!files.length) return;
+
+  state.subtitleFiles = [...(state.subtitleFiles || []), ...files];
+
+  if (state.selectedVideoIdx !== null) {
+    const currentVideoName = state.videos[state.selectedVideoIdx].name;
+    const vBase = getBaseName(currentVideoName).toLowerCase();
+    const match = state.subtitleFiles.find(f => getBaseName(f.name).toLowerCase() === vBase);
+
+    if (match) {
+      loadSubtitleFile(match);
+    } else if (files.length === 1) {
+      loadSubtitleFile(files[0]);
+    } else {
+      showToast(`${files.length} subtitles ready for auto-matching`, 'success');
+    }
+  } else {
+    showToast(`${files.length} subtitles ready for auto-matching`, 'success');
+  }
+
+  this.value = '';
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VIDEO SELECTION
+// ─────────────────────────────────────────────────────────────────────────────
+function selectVideo(idx) {
+  state.selectedVideoIdx = idx;
+  state.subtitles = [];
+  state.currentTime = 0;
+  const file = state.videos[idx];
+  const url = URL.createObjectURL(file);
+  videoEl.src = url;
+  videoEl.load();
+  welcomeEl.style.display = 'none';
+  subtitleOv.style.display = 'none';
+  renderVideoList();
+  renderSubtitle();
+
+  if (state.subtitleFiles && state.subtitleFiles.length > 0) {
+    const vBase = getBaseName(file.name).toLowerCase();
+    const match = state.subtitleFiles.find(f => getBaseName(f.name).toLowerCase() === vBase);
+    if (match) {
+      loadSubtitleFile(match);
+    }
+  }
+}
+
+function renderVideoList() {
+  if (!state.videos.length) {
+    videoList.innerHTML = '<div class="empty-state">No videos selected</div>';
+    return;
+  }
+  videoList.innerHTML = state.videos.map((f, i) => `
+    <div class="video-item ${i === state.selectedVideoIdx ? 'selected' : ''}" onclick="selectVideo(${i})">
+      <svg class="video-item-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 8 6 4-6 4Z"/></svg>
+      <span class="video-item-name" title="${escHtml(f.name)}">${escHtml(f.name)}</span>
+    </div>
+  `).join('');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SUBTITLE PARSING
+// ─────────────────────────────────────────────────────────────────────────────
+function loadSubtitleFile(file) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const text = e.target.result;
+    const ext = file.name.split('.').pop().toLowerCase();
+    try {
+      if (ext === 'srt') {
+        state.subtitles = parseSRT(text);
+      } else if (ext === 'vtt') {
+        state.subtitles = parseVTT(text);
+      } else {
+        state.subtitles = parseSRT(text);
+        if (!state.subtitles.length) state.subtitles = parseVTT(text);
+      }
+      showToast('Subtitles loaded successfully', 'success');
+      renderSubtitle();
+    } catch(err) {
+      console.error('Subtitle parse error:', err);
+      showToast('Failed to parse subtitle file', 'error');
+    }
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function parseSRT(text) {
+  const subs = [];
+  const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+  const blocks = normalized.split(/\n\s*\n+/);
+  for (const block of blocks) {
+    const lines = block.trim().split('\n');
+    if (lines.length < 2) continue;
+    let timeLineIdx = 0;
+    if (/^\d+$/.test(lines[0].trim())) timeLineIdx = 1;
+    const timeLine = lines[timeLineIdx];
+    if (!timeLine) continue;
+    const timeMatch = timeLine.match(/(\d{1,2}:\d{2}:\d{2}[,\.]\d{3})\s*-->\s*(\d{1,2}:\d{2}:\d{2}[,\.]\d{3})/);
+    if (!timeMatch) continue;
+    const start = parseSRTTime(timeMatch[1]);
+    const end = parseSRTTime(timeMatch[2]);
+    const textLines = lines.slice(timeLineIdx + 1);
+    const rawText = textLines.join(' ').trim();
+    const cleanText = rawText.replace(/<[^>]+>/g, '').trim();
+    if (cleanText) {
+      subs.push({ start, end, text: cleanText });
+    }
+  }
+  return subs;
+}
+
+function parseSRTTime(t) {
+  const [hms, ms] = t.replace(',', '.').split('.');
+  const [h, m, s] = hms.split(':').map(Number);
+  return h * 3600 + m * 60 + s + parseFloat('0.' + ms);
+}
+
+function parseVTT(text) {
+  const subs = [];
+  const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+  const lines = normalized.split('\n');
+  let i = 0;
+  while (i < lines.length && !lines[i].includes('-->')) i++;
+  while (i < lines.length) {
+    const timeLine = lines[i];
+    if (!timeLine.includes('-->')) { i++; continue; }
+    const timeMatch = timeLine.match(/(\d{1,2}:)?(\d{2}:\d{2}\.\d{3})\s*-->\s*(\d{1,2}:)?(\d{2}:\d{2}\.\d{3})/);
+    if (!timeMatch) { i++; continue; }
+    const start = parseVTTTime((timeMatch[1] || '') + timeMatch[2]);
+    const end = parseVTTTime((timeMatch[3] || '') + timeMatch[4]);
+    i++;
+    const textLines = [];
+    while (i < lines.length && lines[i].trim() !== '' && !lines[i].includes('-->')) {
+      textLines.push(lines[i]);
+      i++;
+    }
+    const rawText = textLines.join(' ').trim();
+    const cleanText = rawText.replace(/<[^>]+>/g, '').replace(/\{[^}]+\}/g, '').trim();
+    if (cleanText) {
+      subs.push({ start, end, text: cleanText });
+    }
+    while (i < lines.length && lines[i].trim() === '') i++;
+  }
+  return subs;
+}
+
+function parseVTTTime(t) {
+  const parts = t.split(':');
+  if (parts.length === 3) {
+    return parseFloat(parts[0]) * 3600 + parseFloat(parts[1]) * 60 + parseFloat(parts[2]);
+  } else if (parts.length === 2) {
+    return parseFloat(parts[0]) * 60 + parseFloat(parts[1]);
+  }
+  return 0;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VIDEO EVENTS
+// ─────────────────────────────────────────────────────────────────────────────
+function onVideoPlay() {
+  state.isPlaying = true;
+  iconPlay.style.display = 'none';
+  iconPause.style.display = 'block';
+  scheduleControlsHide();
+}
+
+function onVideoPause() {
+  state.isPlaying = false;
+  iconPlay.style.display = 'block';
+  iconPause.style.display = 'none';
+  showControls();
+  clearTimeout(state.controlsHideTimer);
+}
+
+function onTimeUpdate() {
+  state.currentTime = videoEl.currentTime;
+  const dur = videoEl.duration || 0;
+  const pct = dur > 0 ? (state.currentTime / dur) * 100 : 0;
+  progressFill.style.width = pct + '%';
+  timeDisplay.textContent = `${formatTime(state.currentTime)} / ${formatTime(dur)}`;
+  renderSubtitle();
+}
+
+function onMetadataLoaded() {
+  state.duration = videoEl.duration;
+}
+
+function onFullscreenChange() {
+  state.isFullscreen = !!document.fullscreenElement;
+  iconFS.style.display = state.isFullscreen ? 'none' : 'block';
+  iconMin.style.display = state.isFullscreen ? 'block' : 'none';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PLAYBACK CONTROLS
+// ─────────────────────────────────────────────────────────────────────────────
+function togglePlay() {
+  if (!videoEl.src) return;
+  if (videoEl.paused) {
+    videoEl.play();
+  } else {
+    videoEl.pause();
+  }
+}
+
+function toggleMute() {
+  state.isMuted = !state.isMuted;
+  videoEl.muted = state.isMuted;
+  iconVol.style.display = state.isMuted ? 'none' : 'block';
+  iconMute.style.display = state.isMuted ? 'block' : 'none';
+}
+
+function handleVolumeChange(val) {
+  state.volume = parseFloat(val);
+  videoEl.volume = state.volume;
+  if (state.volume === 0) {
+    state.isMuted = true;
+    videoEl.muted = true;
+    iconVol.style.display = 'none';
+    iconMute.style.display = 'block';
+  } else if (state.isMuted) {
+    state.isMuted = false;
+    videoEl.muted = false;
+    iconVol.style.display = 'block';
+    iconMute.style.display = 'none';
+  }
+}
+
+function handleSeekClick(e) {
+  if (!videoEl.duration) return;
+  const rect = e.currentTarget.getBoundingClientRect();
+  const pos = (e.clientX - rect.left) / rect.width;
+  videoEl.currentTime = Math.max(0, Math.min(videoEl.duration, pos * videoEl.duration));
+}
+
+function seekBy(seconds) {
+  if (!videoEl.src) return;
+  const newTime = Math.max(0, Math.min(videoEl.duration || 0, videoEl.currentTime + seconds));
+  videoEl.currentTime = newTime;
+  const flashEl = seconds < 0 ? seekLeft : seekRight;
+  const label = seconds < 0 ? `◀◀ ${Math.abs(seconds)}s` : `${seconds}s ▶▶`;
+  flashEl.textContent = label;
+  flashEl.classList.add('show');
+  clearTimeout(flashEl._timer);
+  flashEl._timer = setTimeout(() => flashEl.classList.remove('show'), 700);
+}
+
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.getElementById('player-area').requestFullscreen();
+  } else {
+    document.exitFullscreen();
+  }
+}
+
+function showControls() {
+  controlsOv.classList.remove('hidden');
+}
+function scheduleControlsHide() {
+  clearTimeout(state.controlsHideTimer);
+  showControls();
+  if (state.isPlaying) {
+    state.controlsHideTimer = setTimeout(() => {
+      if (state.isPlaying) controlsOv.classList.add('hidden');
+    }, 3000);
+  }
+}
+
+document.getElementById('player-area').addEventListener('mousemove', () => {
+  scheduleControlsHide();
+});
+document.getElementById('player-area').addEventListener('mouseleave', () => {
+  if (state.isPlaying) controlsOv.classList.add('hidden');
+});
+document.getElementById('player-area').addEventListener('click', (e) => {
+  if (e.target === videoEl) {
+    togglePlay();
+    scheduleControlsHide();
+  }
+});
+
+document.getElementById('player-area').addEventListener('dblclick', (e) => {
+  if (e.target === videoEl) {
+    e.preventDefault();
+    toggleFullscreen();
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// KEYBOARD SHORTCUTS
+// ─────────────────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', (e) => {
+  if (document.activeElement && ['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) return;
+  if (!videoEl.src) return;
+
+  switch(e.key) {
+    case ' ':
+    case 'k':
+      e.preventDefault();
+      togglePlay();
+      break;
+    case 'ArrowLeft':
+      e.preventDefault();
+      seekBy(-5);
+      scheduleControlsHide();
+      break;
+    case 'ArrowRight':
+      e.preventDefault();
+      seekBy(5);
+      scheduleControlsHide();
+      break;
+    case 'm':
+      e.preventDefault();
+      toggleMute();
+      break;
+    case 'f':
+      e.preventDefault();
+      toggleFullscreen();
+      break;
+    case 'ArrowUp':
+      e.preventDefault();
+      volSlider.value = Math.min(1, parseFloat(volSlider.value) + 0.1);
+      handleVolumeChange(volSlider.value);
+      break;
+    case 'ArrowDown':
+      e.preventDefault();
+      volSlider.value = Math.max(0, parseFloat(volSlider.value) - 0.1);
+      handleVolumeChange(volSlider.value);
+      break;
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SUBTITLE RENDERING
+// ─────────────────────────────────────────────────────────────────────────────
+function getCurrentSubtitle() {
+  const t = state.currentTime;
+  return state.subtitles.find(s => t >= s.start && t <= s.end) || null;
+}
+
+let lastSubtitleText = null;
+
+function renderSubtitle() {
+  const sub = getCurrentSubtitle();
+  if (!sub) {
+    if (lastSubtitleText !== null) {
+      subtitleOv.style.display = 'none';
+      subtitleText.innerHTML = '';
+      lastSubtitleText = null;
+      closeAllPopups();
+    }
+    return;
+  }
+  if (sub.text === lastSubtitleText) return; 
+  lastSubtitleText = sub.text;
+  closeAllPopups();
+  subtitleOv.style.display = 'flex';
+
+  const words = sub.text.split(/\s+/);
+  subtitleText.innerHTML = words.map((word, idx) => {
+    const clean = word.replace(/[.,!?;:"'()\[\]{}]/g, '').trim();
+    return `<span
+      class="subtitle-word"
+      data-word="${escHtml(clean)}"
+      data-idx="${idx}"
+      onmouseenter="handleWordHover(this, '${escHtml(clean)}')"
+      onmouseleave="handleWordLeave(this)"
+    >${escHtml(word)}</span>`;
+  }).join('');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WORD HOVER: TRANSLATE + PAUSE
+// ─────────────────────────────────────────────────────────────────────────────
+let hoverLeaveTimer = null;
+
+function handleWordHover(spanEl, word) {
+  if (!word) return;
+  clearTimeout(hoverLeaveTimer);
+  clearTimeout(state.hoverIntentTimer);
+
+  // Updated delay to 0.2s
+  state.hoverIntentTimer = setTimeout(() => {
+    document.querySelectorAll('.word-popup').forEach(p => p.remove());
+    document.querySelectorAll('.subtitle-word').forEach(el => el.classList.remove('active-word'));
+
+    if (!videoEl.paused) {
+      videoEl.pause();
+      state.hoverPauseActive = true;
+    }
+
+    spanEl.classList.add('active-word');
+    state.hoveredWord = word;
+    state.popupWordEl = spanEl;
+
+    showWordPopup(spanEl, word);
+
+    if (!state.translationCache[word]) {
+      fetchTranslation(word, spanEl);
+    } else {
+      updatePopupContent(spanEl, word, state.translationCache[word]);
+    }
+  }, 200); 
+}
+
+function handleWordLeave(spanEl) {
+  clearTimeout(state.hoverIntentTimer);
+  clearTimeout(hoverLeaveTimer);
+  hoverLeaveTimer = setTimeout(() => {
+    const popup = spanEl.querySelector('.word-popup');
+    if (popup && popup.matches(':hover')) return;
+
+    spanEl.classList.remove('active-word');
+    closePopupFor(spanEl);
+
+    if (state.hoverPauseActive && videoEl.paused) {
+      videoEl.play();
+      state.hoverPauseActive = false;
+    }
+    state.hoveredWord = null;
+    state.popupWordEl = null;
+  }, 80);
+}
+
+function showWordPopup(spanEl, word) {
+  const existing = spanEl.querySelector('.word-popup');
+  if (existing) existing.remove();
+
+  const cached = state.translationCache[word];
+  const popup = document.createElement('div');
+  popup.className = 'word-popup';
+  popup.innerHTML = `
+    <div class="popup-word">${escHtml(word)}</div>
+    ${cached
+      ? `<div class="popup-translation">${escHtml(cached)}</div>`
+      : `<div class="popup-loading" id="popup-loading-${escHtml(word)}">Translating…</div>`
+    }
+    <div class="popup-actions">
+      <button class="popup-btn popup-btn-speak" onclick="pronounceWord('${escHtml(word)}')">
+        🔊 Listen
+      </button>
+      <button
+        class="popup-btn popup-btn-save"
+        id="popup-save-${escHtml(word)}"
+        ${cached ? '' : 'disabled'}
+        onclick="saveWordFromPopup('${escHtml(word)}', this)"
+      >Save</button>
+    </div>
+  `;
+  popup.addEventListener('mouseenter', () => {
+    clearTimeout(hoverLeaveTimer);
+  });
+  popup.addEventListener('mouseleave', () => {
+    handleWordLeave(spanEl);
+  });
+  spanEl.appendChild(popup);
+}
+
+function updatePopupContent(spanEl, word, translation) {
+  const loadingEl = spanEl.querySelector(`#popup-loading-${CSS.escape(word)}`);
+  if (loadingEl) {
+    loadingEl.className = 'popup-translation';
+    loadingEl.id = '';
+    loadingEl.textContent = translation;
+  }
+  const saveBtn = spanEl.querySelector(`#popup-save-${CSS.escape(word)}`);
+  if (saveBtn) saveBtn.disabled = false;
+}
+
+function closePopupFor(spanEl) {
+  const popup = spanEl.querySelector('.word-popup');
+  if (popup) popup.remove();
+}
+
+function closeAllPopups() {
+  document.querySelectorAll('.word-popup').forEach(p => p.remove());
+  document.querySelectorAll('.subtitle-word').forEach(el => el.classList.remove('active-word'));
+  if (state.hoverPauseActive && videoEl.paused) {
+    videoEl.play();
+    state.hoverPauseActive = false;
+  }
+  state.hoveredWord = null;
+  state.popupWordEl = null;
+}
+
+async function translateWithDeepl(word) {
+  const body = JSON.stringify({
+    jsonrpc: '2.0',
+    method: 'LMT_handle_jobs',
+    params: {
+      jobs: [{
+        kind: 'default',
+        sentences: [{ text: word, id: 1, prefix: '' }],
+        raw_en_context_before: [],
+        raw_en_context_after: [],
+        preferred_num_beams: 4
+      }],
+      lang: {
+        source_lang_user_selected: 'DE',
+        target_lang: 'EN'
+      },
+      priority: 1,
+      commonJobParams: {
+        mode: 'translate',
+        browserType: 1
+      },
+      timestamp: getDeeplTimestamp(word)
+    },
+    id: Math.floor(Math.random() * 100000) + 1
+  });
+
+  const resp = await fetch('https://www2.deepl.com/jsonrpc', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body
+  });
+  if (!resp.ok) throw new Error(`DeepL HTTP ${resp.status}`);
+  const data = await resp.json();
+  const translation = data?.result?.translations?.[0]?.beams?.[0]?.sentences?.[0]?.text?.trim();
+  if (!translation || translation.toLowerCase() === word.toLowerCase()) {
+    throw new Error('DeepL returned no useful translation');
+  }
+  return translation;
+}
+
+function getDeeplTimestamp(text) {
+  const iCount = (text.match(/i/gi) || []).length + 1;
+  let ts = Date.now();
+  if (iCount !== 0) {
+    ts = ts - (ts % iCount) + iCount;
+  }
+  return ts;
+}
+
+async function translateWithGoogle(word) {
+  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=de&tl=en&dt=t&q=${encodeURIComponent(word)}`;
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`Google HTTP ${resp.status}`);
+  const data = await resp.json();
+  const translation = data?.[0]?.map(chunk => chunk?.[0]).filter(Boolean).join('').trim();
+  if (!translation || translation.toLowerCase() === word.toLowerCase()) {
+    throw new Error('Google returned no useful translation');
+  }
+  return translation;
+}
+
+async function fetchTranslation(word, spanEl) {
+  let translation = null;
+  try {
+    translation = await translateWithDeepl(word);
+  } catch (deeplErr) {
+    try {
+      translation = await translateWithGoogle(word);
+    } catch (googleErr) {}
+  }
+
+  if (translation) {
+    state.translationCache[word] = translation;
+    if (spanEl && spanEl.isConnected) {
+      updatePopupContent(spanEl, word, translation);
+    }
+  } else {
+    const fallback = '(translation unavailable)';
+    state.translationCache[word] = fallback;
+    if (spanEl && spanEl.isConnected) {
+      updatePopupContent(spanEl, word, fallback);
+    }
+  }
+}
+
+function pronounceWord(word) {
+  if (!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const utt = new SpeechSynthesisUtterance(word);
+  utt.lang = 'de-DE';
+  utt.rate = 0.85;
+  setTimeout(() => window.speechSynthesis.speak(utt), 50);
+}
+
+function saveWordFromPopup(word, btn) {
+  const translation = state.translationCache[word];
+  if (!word || !translation) return;
+  saveWord(word, translation);
+  btn.textContent = '✓ Saved';
+  btn.disabled = true;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SAVED WORDS
+// ─────────────────────────────────────────────────────────────────────────────
+async function saveWord(german, english) {
+  if (state.savedWords.some(w => w.german === german)) {
+    showToast('Word already saved', 'error');
+    return;
+  }
+  try {
+    const resp = await fetch(`${API}/words`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ german, english })
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      state.savedWords.unshift(data);
+    } else {
+      throw new Error('Backend unavailable');
+    }
+  } catch {
+    const entry = { id: Date.now(), german, english };
+    state.savedWords.unshift(entry);
+  }
+  persistWords();
+  renderWordsList();
+  showToast(`Saved: ${german}`, 'success');
+}
+
+async function deleteWord(id) {
+  try {
+    await fetch(`${API}/words/${id}`, { method: 'DELETE' });
+  } catch {}
+  state.savedWords = state.savedWords.filter(w => w.id !== id);
+  persistWords();
+  renderWordsList();
+}
+
+function persistWords() {
+  localStorage.setItem('de_saved_words', JSON.stringify(state.savedWords));
+}
+
+function renderWordsList() {
+  if (!state.savedWords.length) {
+    wordsList.innerHTML = '<div class="empty-state">No saved words yet</div>';
+    return;
+  }
+  wordsList.innerHTML = state.savedWords.map(w => `
+    <div class="word-item">
+      <div>
+        <div class="word-de">${escHtml(w.german)}</div>
+        <div class="word-en">${escHtml(w.english)}</div>
+      </div>
+      <button class="word-delete" onclick="deleteWord(${w.id})" title="Remove">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+      </button>
+    </div>
+  `).join('');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TABS
+// ─────────────────────────────────────────────────────────────────────────────
+function switchTab(name) {
+  state.activeTab = name;
+  document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+    btn.classList.toggle('active', (i === 0 ? 'videos' : 'words') === name);
+  });
+  document.getElementById('tab-videos').classList.toggle('active', name === 'videos');
+  document.getElementById('tab-words').classList.toggle('active', name === 'words');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TOAST
+// ─────────────────────────────────────────────────────────────────────────────
+function showToast(msg, type = 'success') {
+  const el = document.createElement('div');
+  el.className = `toast-item toast-${type}`;
+  el.textContent = msg;
+  toastEl.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UTILS
+// ─────────────────────────────────────────────────────────────────────────────
+function formatTime(s) {
+  if (!s || isNaN(s)) return '0:00';
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${m}:${sec.toString().padStart(2, '0')}`;
+}
+
+function escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function getBaseName(filename) {
+  const idx = filename.lastIndexOf('.');
+  return idx === -1 ? filename : filename.substring(0, idx);
+}
+
+if (!window.CSS || !CSS.escape) {
+  window.CSS = window.CSS || {};
+  CSS.escape = function(value) {
+    return String(value).replace(/[^\w-]/g, (c) => '\\' + c);
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────────────────────────
+renderWordsList();
+renderVideoList();
+showControls();
+</script>
+</body>
+</html>
